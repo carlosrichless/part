@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Player de Partitura - Bateria</title>
+  
+  <!-- AlphaTab CSS & JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@latest/dist/alphaTab.min.js"></script>
+  
+  <!-- FontAwesome para ícones -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f4f4f9;
+      color: #333;
+    }
+
+    .player-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+
+    /* Barra de Controles superiores */
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 15px 20px;
+      background-color: #2c3e50;
+      color: #fff;
+      flex-wrap: wrap;
+    }
+
+    .controls-bar button, .file-input-label {
+      background: #3498db;
+      border: none;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .controls-bar button:hover, .file-input-label:hover {
+      background: #2980b9;
+    }
+
+    .controls-bar button:disabled {
+      background: #7f8c8d;
+      cursor: not-allowed;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Área da partitura */
+    .sheet-wrapper {
+      position: relative;
+      padding: 20px;
+      max-height: 700px;
+      overflow-y: auto;
+      background: #fff;
+    }
+
+    #alphatab {
+      width: 100%;
+    }
+
+    /* ========================================================
+       AJUSTES DOS CURSORES (HORIZONTAL DE COMPASSO E VERTICAL DE TEMPO)
+       ======================================================== */
+
+    /* 1. Destaque Horizontal do Compasso Atual */
+    .at-cursor-bar {
+      background: rgba(231, 76, 60, 0.08) !important;
+      border-top: 1px dashed rgba(231, 76, 60, 0.3);
+      border-bottom: 1px dashed rgba(231, 76, 60, 0.3);
+    }
+    
+    /* 2. Barra Vertical Vermelha Transparente do Tempo / Nota */
+    .at-cursor-beat {
+      background: rgba(255, 0, 0, 0.85) !important; /* Vermelho visível e transparente */
+      width: 3px !important;                           /* Espessura da barra vertical */
+      box-shadow: 0 0 8px rgba(255, 0, 0, 0.7);       /* Brilho vermelho */
+      z-index: 20;
+    }
+
+    /* Cursor do rato para indicar que a pauta é clicável */
+    #alphatab .at-surface {
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div class="player-container">
+  <!-- Barra de Controles -->
+  <div class="controls-bar">
+    <label class="file-input-label">
+      <i class="fa-solid fa-folder-open"></i> Carregar .MXL
+      <input type="file" id="fileInput" accept=".mxl,.xml,.musicxml">
+    </label>
+
+    <button id="btnPlayPause" disabled>
+      <i class="fa-solid fa-play"></i> Play
+    </button>
+
+    <button id="btnStop" disabled>
+      <i class="fa-solid fa-stop"></i> Parar
+    </button>
+
+    <div class="control-group">
+      <label for="speedSelect">Andamento:</label>
+      <select id="speedSelect" style="padding: 5px; border-radius: 4px;">
+        <option value="0.5">50%</option>
+        <option value="0.75">75%</option>
+        <option value="1.0" selected>100%</option>
+        <option value="1.25">125%</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Exibição da Partitura -->
+  <div class="sheet-wrapper">
+    <div id="alphatab"></div>
+  </div>
+</div>
+
+<script>
+  const element = document.getElementById('alphatab');
+  
+  // Inicialização do AlphaTab
+  const api = new alphaTab.AlphaTabApi(element, {
+    core: {
+      fontDirectory: 'https://cdn.jsdelivr.net/npm/@coderline/alphatab@latest/dist/font/'
+    },
+    player: {
+      enablePlayer: true,
+      soundFont: 'https://cdn.jsdelivr.net/npm/@coderline/alphatab@latest/dist/soundfont/sonivox.sf2',
+      enableCursor: true,             // Ativa os cursores visuais
+      scrollElement: '.sheet-wrapper', // Rolagem automática da página
+      clickBehavior: alphaTab.synth.ClickBehavior.Seek // Permite clicar na nota para mover o tempo
+    },
+    display: {
+      staveProfile: 'Score'
+    }
+  });
+
+  // Elementos do DOM
+  const fileInput = document.getElementById('fileInput');
+  const btnPlayPause = document.getElementById('btnPlayPause');
+  const btnStop = document.getElementById('btnStop');
+  const speedSelect = document.getElementById('speedSelect');
+
+  // Carregar ficheiro MXL local
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const buffer = new Uint8Array(evt.target.result);
+      api.load(buffer);
+    };
+    reader.readAsArrayBuffer(file);
+  });
+
+  // Habilitar botões quando o player estiver pronto
+  api.playerReady.on(() => {
+    btnPlayPause.disabled = false;
+    btnStop.disabled = false;
+  });
+
+  // Controlar Play / Pause
+  btnPlayPause.addEventListener('click', () => {
+    api.playPause();
+  });
+
+  // Atualizar o ícone do botão dependendo do estado da reprodução
+  api.playerStateChanged.on((args) => {
+    if (args.state === alphaTab.synth.PlayerState.Playing) {
+      btnPlayPause.innerHTML = '<i class="fa-solid fa-pause"></i> Pause';
+    } else {
+      btnPlayPause.innerHTML = '<i class="fa-solid fa-play"></i> Play';
+    }
+  });
+
+  // Botão Parar
+  btnStop.addEventListener('click', () => {
+    api.stop();
+  });
+
+  // Alterar velocidade / andamento
+  speedSelect.addEventListener('change', (e) => {
+    api.playbackSpeed = parseFloat(e.target.value);
+  });
+</script>
+
+</body>
+</html>
